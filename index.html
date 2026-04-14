@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B1 Exam Practice - Anti-Fraud Analytics</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --danger: #e74c3c;
+            --success: #27ae60;
+            --bg: #f8f9fa;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--primary); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 600px; width: 100%; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .timer { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
+        .question-box { margin-bottom: 20px; }
+        .question-text { font-size: 1.1rem; font-weight: 600; line-height: 1.5; margin-bottom: 15px; }
+        .is-critical { color: var(--danger); border-left: 4px solid var(--danger); padding-left: 10px; }
+        .option { display: block; width: 100%; padding: 12px 15px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; text-align: left; cursor: pointer; transition: 0.2s; background: white; font-size: 1rem; }
+        .option:hover { background: #f0f7ff; border-color: var(--accent); }
+        .option.selected { background: var(--accent); color: white; border-color: var(--accent); }
+        .controls { display: flex; justify-content: space-between; margin-top: 20px; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        #next-btn { background: var(--primary); color: white; }
+        #submit-btn { background: var(--success); color: white; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; font-size: 0.9rem; }
+        .hidden { display: none; }
+        .result-screen { text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="quiz-app">
+    <div class="header">
+        <div id="progress">Câu hỏi 1/30</div>
+        <div class="timer" id="timer">20:00</div>
+    </div>
+
+    <div id="quiz-content">
+        <div class="question-box">
+            <div id="question-text" class="question-text">Đang tải dữ liệu câu hỏi...</div>
+            <div id="options-list"></div>
+        </div>
+        <div class="controls">
+            <button id="prev-btn" onclick="prevQuestion()" style="background:#ccc">Câu trước</button>
+            <button id="next-btn" onclick="nextQuestion()">Câu tiếp theo</button>
+            <button id="submit-btn" class="hidden" onclick="showResult()">Nộp bài</button>
+        </div>
+    </div>
+
+    <div id="result-content" class="result-screen hidden">
+        <h2 id="result-status">Kết quả</h2>
+        <div style="font-size: 3rem; margin: 20px 0;" id="final-score">0/30</div>
+        <div id="result-detail"></div>
+        <button onclick="location.reload()" style="margin-top:20px; background:var(--accent); color:white;">Làm đề mới</button>
+    </div>
+</div>
+
+<script>
+    // Dữ liệu mẫu (Bạn có thể mở rộng lên 600 câu)
+    const database = [
+        { id: 1, q: "Hành vi đưa xe cơ giới không đảm bảo tiêu chuẩn an toàn kỹ thuật vào tham gia giao thông bị nghiêm cấm không?", options: ["Không bị nghiêm cấm", "Bị nghiêm cấm", "Bị nghiêm cấm tùy từng trường hợp"], a: 1, critical: true },
+        { id: 2, q: "Người lái xe không được quay đầu xe ở nơi nào dưới đây?", options: ["Ở phần đường dành cho người đi bộ qua đường", "Trên cầu, đầu cầu, gầm cầu vượt", "Tất cả các ý nêu trên"], a: 2, critical: false },
+        { id: 3, q: "Cuộc đua xe chỉ được thực hiện khi nào?", options: ["Diễn ra trên đường phố không có người qua lại", "Được người dân ủng hộ", "Được cơ quan có thẩm quyền cấp phép"], a: 2, critical: true },
+        // Thêm các câu hỏi khác vào đây...
+    ];
+
+    let currentQuestions = [];
+    let currentIndex = 0;
+    let userAnswers = {};
+    let timeLeft = 20 * 60;
+
+    function initQuiz() {
+        // Thuật toán lấy ngẫu nhiên 30 câu từ database
+        currentQuestions = [...database].sort(() => 0.5 - Math.random()).slice(0, 30);
+        renderQuestion();
+        startTimer();
+    }
+
+    function renderQuestion() {
+        const q = currentQuestions[currentIndex];
+        document.getElementById('progress').innerText = `Câu hỏi ${currentIndex + 1}/30`;
+        const qText = document.getElementById('question-text');
+        qText.innerText = q.q;
+        qText.classList.toggle('is-critical', q.critical);
+        if(q.critical) qText.innerText = "[ĐIỂM LIỆT] " + q.q;
+
+        const optionsDiv = document.getElementById('options-list');
+        optionsDiv.innerHTML = '';
+        
+        q.options.forEach((opt, i) => {
+            const btn = document.createElement('button');
+            btn.className = `option ${userAnswers[currentIndex] === i ? 'selected' : ''}`;
+            btn.innerText = opt;
+            btn.onclick = () => selectOption(i);
+            optionsDiv.appendChild(btn);
+        });
+
+        document.getElementById('prev-btn').style.visibility = currentIndex === 0 ? 'hidden' : 'visible';
+        if (currentIndex === currentQuestions.length - 1) {
+            document.getElementById('next-btn').classList.add('hidden');
+            document.getElementById('submit-btn').classList.remove('hidden');
+        } else {
+            document.getElementById('next-btn').classList.remove('hidden');
+            document.getElementById('submit-btn').classList.add('hidden');
+        }
+    }
+
+    function selectOption(index) {
+        userAnswers[currentIndex] = index;
+        renderQuestion();
+    }
+
+    function nextQuestion() { if(currentIndex < 29) { currentIndex++; renderQuestion(); } }
+    function prevQuestion() { if(currentIndex > 0) { currentIndex--; renderQuestion(); } }
+
+    function startTimer() {
+        const timerEl = document.getElementById('timer');
+        const interval = setInterval(() => {
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            timerEl.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            if (timeLeft <= 0) { clearInterval(interval); showResult(); }
+            timeLeft--;
+        }, 1000);
+    }
+
+    function showResult() {
+        document.getElementById('quiz-content').classList.add('hidden');
+        const resultContent = document.getElementById('result-content');
+        resultContent.classList.remove('hidden');
+
+        let correct = 0;
+        let failedCritical = false;
+
+        currentQuestions.forEach((q, i) => {
+            if (userAnswers[i] === q.a) {
+                correct++;
+            } else if (q.critical) {
+                failedCritical = true;
+            }
+        });
+
+        const isPassed = correct >= 27 && !failedCritical;
+        const statusEl = document.getElementById('result-status');
+        statusEl.innerText = isPassed ? "CHÚC MỪNG: BẠN ĐÃ ĐẬU!" : "KẾT QUẢ: KHÔNG ĐẠT";
+        statusEl.style.color = isPassed ? "var(--success)" : "var(--danger)";
+        
+        document.getElementById('final-score').innerText = `${correct}/30`;
+        document.getElementById('result-detail').innerHTML = `
+            <p>Số câu đúng: ${correct}</p>
+            <p>${failedCritical ? "Lưu ý: Bạn đã sai câu điểm liệt!" : "Bạn không sai câu điểm liệt."}</p>
+        `;
+    }
+
+    initQuiz();
+</script>
+
+</body>
+</html>
